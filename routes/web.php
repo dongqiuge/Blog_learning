@@ -43,3 +43,12 @@ Route::delete('logout', 'SessionsController@destroy')->name('logout');
 
 // 激活用户账号
 Route::get('signup/confirm/{token}', 'UsersController@confirmEmail')->name('confirm_email');
+
+// 显示密码重设页面, 填写 Email 的表单
+Route::get('password/reset', 'PasswordController@showLinkRequestForm')->name('password.request');
+// 发送密码重设邮件, 处理表单提交，成功的话就发送邮件，附带 Token 的链接
+Route::post('password/email', 'PasswordController@sendResetLinkEmail')->name('password.email');
+// 密码更新页面, 显示更新密码的表单，包含 token
+Route::get('password/reset/{token}', 'PasswordController@showResetForm')->name('password.reset');
+// 执行密码更新操作, 对提交过来的 token 和 email 数据进行配对，正确的话更新密码
+Route::post('password/reset', 'PasswordController@reset')->name('password.update');

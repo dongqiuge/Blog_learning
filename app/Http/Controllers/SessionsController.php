@@ -19,6 +19,11 @@ class SessionsController extends Controller
         $this->middleware('guest', [
             'only' => ['create']
         ]);
+
+        // 限制 10 分钟内尝试登录的次数为 10 次
+        $this->middleware('throttle:10,10', [
+            'only' => ['store']
+        ]);
     }
 
     /**
@@ -47,12 +52,18 @@ class SessionsController extends Controller
 
         // Laravel 中 Auth 的 attempt 方法可以让我们很方便的完成用户的身份认证操作
         if (Auth::attempt($credential, $request->has('remember'))) {
-            // 登录成功
-            session()->flash('success', '欢迎回来！');
-            $fallback = route('users.show', Auth::user());
-            // intended 方法可将页面重定向到上一次请求尝试访问的页面上
-            // 如果上一次请求记录为空，则跳转到默认地址, 这里是用户个人页面
-            return redirect()->intended($fallback);
+            if (Auth::user()->activated){
+                // 登录成功
+                session()->flash('success', '欢迎回来！');
+                $fallback = route('users.show', Auth::user());
+                // intended 方法可将页面重定向到上一次请求尝试访问的页面上
+                // 如果上一次请求记录为空，则跳转到默认地址, 这里是用户个人页面
+                return redirect()->intended($fallback);
+            }else{
+                Auth::logout();
+                session()->flash('warning', '您的账号未激活，请检查邮箱中的注册邮件进行激活。');
+                return redirect('/');
+            }
         } else {
             // 登录失败
             session()->flash('danger', '抱歉，您的邮箱和密码不匹配');

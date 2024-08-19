@@ -1,6 +1,5 @@
 <?php
 
-
 namespace App\Http\Controllers;
 
 use Illuminate\Auth\Access\AuthorizationException;
@@ -11,6 +10,7 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 
 class UsersController extends Controller
@@ -22,12 +22,17 @@ class UsersController extends Controller
         // 已经登录的用户才可以访问个人信息编辑页面
         // except 方法来设定 指定动作 不使用 Auth 中间件进行过滤
         $this->middleware('auth', [
-            'except' => ['show', 'create', 'store', 'index']
+            'except' => ['show', 'create', 'store', 'index', 'confirmEmail']
         ]);
 
         // 只让未登录用户访问注册页面
         $this->middleware('guest', [
             'only' => ['create']
+        ]);
+
+        // 限制一个小时内只能提交注册请求 10 次
+        $this->middleware('throttle:10,60', [
+            'only' => ['store']
         ]);
     }
 
@@ -49,7 +54,10 @@ class UsersController extends Controller
      */
     public function show(User $user): Factory|View|Application
     {
-        return view('users.show', compact('user'));
+        $statuses = $user->statuses()
+            ->orderBy('created_at', 'desc')
+            ->paginate(10);
+        return view('users.show', compact('user', 'statuses'));
     }
 
     /**
@@ -73,9 +81,9 @@ class UsersController extends Controller
             'password' => bcrypt($request->password)
         ]);
 
-        Auth::login($user);
-        session()->flash('success', '注册成功！');
-        return redirect()->route('users.show', [$user]);
+        $this->sendEmailConfirmationTo($user);
+        session()->flash('success', '验证邮件已经发送到你的注册邮箱上，请注意查收。');
+        return redirect()->route('home');
     }
 
     /**
@@ -149,5 +157,42 @@ class UsersController extends Controller
         session()->flash('success', '成功删除用户！');
         // back() 方法会将用户重定向到之前的页面上
         return back();
+    }
+
+    /**
+     * 发送注册激活邮件
+     *
+     * @param $user
+     * @return void
+     */
+    public function sendEmailConfirmationTo($user): void
+    {
+        $view = 'emails.confirm';
+        $data = compact('user');
+        $to = $user->email;
+        $subject = '感谢注册 Weibo 应用！请确认你的邮箱。';
+
+        Mail::send($view, $data, function ($message) use ($to, $subject) {
+            $message->to($to)->subject($subject);
+        });
+    }
+
+    /**
+     * 用于激活用户
+     *
+     * @param $token
+     * @return RedirectResponse
+     */
+    public function confirmEmail($token): RedirectResponse
+    {
+        $user = User::where('activation_token', $token)->firstOrFail();
+
+        $user->activated = true;
+        $user->activation_token = null;
+        $user->save();
+
+        Auth::login($user);
+        session()->flash('success', '恭喜你，激活成功！');
+        return redirect()->route('users.show', [$user]);
     }
 }

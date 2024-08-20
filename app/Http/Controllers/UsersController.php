@@ -195,4 +195,30 @@ class UsersController extends Controller
         session()->flash('success', '恭喜你，激活成功！');
         return redirect()->route('users.show', [$user]);
     }
+
+    /**
+     * 显示用户的关注列表
+     *
+     * @param User $user
+     * @return Factory|View|Application
+     */
+    public function followings(User $user): Factory|View|Application
+    {
+        $users = $user->followings()->paginate(30);
+        $title = $user->name . '关注的人';
+        return view('users.show_follow', compact('users', 'title'));
+    }
+
+    /**
+     * 显示用户的粉丝列表
+     *
+     * @param User $user
+     * @return Factory|View|Application
+     */
+    public function followers(User $user): Factory|View|Application
+    {
+        $users = $user->followers()->paginate(30);
+        $title = $user->name . '的粉丝';
+        return view('users.show_follow', compact('users', 'title'));
+    }
 }
